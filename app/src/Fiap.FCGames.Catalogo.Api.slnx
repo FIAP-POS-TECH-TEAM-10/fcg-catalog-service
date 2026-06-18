@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/1.Api/">
+    <Project Path="Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj" />
+    <Project Path="Fiap.FCGames.Catalogo.Application/Fiap.FCGames.Catalogo.Application.csproj" />
+    <Project Path="Fiap.FCGames.Catalogo.CrossCutting/Fiap.FCGames.Catalogo.CrossCutting.csproj" />
+    <Project Path="Fiap.FCGames.Catalogo.Domain/Fiap.FCGames.Catalogo.Domain.csproj" />
+    <Project Path="Fiap.FCGames.Catalogo.Infra/Fiap.FCGames.Catalogo.Infra.csproj" />
+  </Folder>
+</Solution>
