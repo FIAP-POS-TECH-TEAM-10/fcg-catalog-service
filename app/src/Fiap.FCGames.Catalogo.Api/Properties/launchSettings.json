@@ -1,31 +1,20 @@
 {
-  "profiles": {
-    "Api.Development": {
-      "commandName": "Project",
-      "launchBrowser": true,
-      "launchUrl": "swagger",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      },
-      "dotnetRunMessages": true,
-      "applicationUrl": "http://localhost:5017"
-    },
-    "IIS Express": {
-      "commandName": "IISExpress",
-      "launchBrowser": true,
-      "launchUrl": "swagger",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    }
-  },
   "$schema": "https://json.schemastore.org/launchsettings.json",
-  "iisSettings": {
-    "windowsAuthentication": false,
-    "anonymousAuthentication": true,
-    "iisExpress": {
-      "applicationUrl": "http://localhost:57128/",
-      "sslPort": 44343
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5002",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "JWT__KEY": "ChaveSegredoLocalDesenvolvimento1234567890Ab",
+        "JWT__ISSUER": "AppFiapFcGames",
+        "ConnectionStrings__DefaultConnection": "Data Source=fcgames.db",
+        "RabbitMQ__Host": "localhost",
+        "RabbitMQ__Username": "guest",
+        "RabbitMQ__Password": "guest"
+      }
     }
   }
 }
