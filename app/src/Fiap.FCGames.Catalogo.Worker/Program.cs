@@ -1,6 +1,8 @@
 using Fiap.FCGames.Catalogo.CrossCutting.Extensions;
+using Fiap.FCGames.Catalogo.Infra.DataProvider.Contexto;
 using Fiap.FCGames.Catalogo.Worker.Consumers;
 using MassTransit;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -46,4 +48,11 @@ builder.Services.AddMassTransit(x =>
 });
 
 var host = builder.Build();
+
+using (var scope = host.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<FcGamesContexto>();
+    db.Database.Migrate();
+}
+
 await host.RunAsync();
