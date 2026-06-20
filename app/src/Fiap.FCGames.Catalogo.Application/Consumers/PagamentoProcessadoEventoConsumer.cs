@@ -1,4 +1,7 @@
 using FCGames.IntegrationEvents;
+using Fiap.FCGames.Catalogo.Domain.Aggregates.AggregateBiblioteca;
+using Fiap.FCGames.Catalogo.Domain.Enums;
+using Fiap.FCGames.Catalogo.Infra.DataProvider.Interface;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
@@ -6,15 +9,68 @@ namespace Fiap.FCGames.Catalogo.Application.Consumers;
 
 public class PagamentoProcessadoEventoConsumer : IConsumer<PagamentoProcessadoEvento>
 {
+    private readonly IUnitOfWork _uow;
     private readonly ILogger<PagamentoProcessadoEventoConsumer> _logger;
 
-    public PagamentoProcessadoEventoConsumer(ILogger<PagamentoProcessadoEventoConsumer> logger) => _logger = logger;
-
-    public Task Consume(ConsumeContext<PagamentoProcessadoEvento> context)
+    public PagamentoProcessadoEventoConsumer(IUnitOfWork uow, ILogger<PagamentoProcessadoEventoConsumer> logger)
     {
-        // Implementado na Task 13 (FASE 4)
-        _logger.LogInformation("PagamentoProcessadoEvento recebido para PedidoId {PedidoId} Status {Status}",
-            context.Message.PedidoId, context.Message.Status);
-        return Task.CompletedTask;
+        _uow = uow;
+        _logger = logger;
+    }
+
+    public async Task Consume(ConsumeContext<PagamentoProcessadoEvento> context)
+    {
+        var evt = context.Message;
+
+        var pedido = await _uow.PedidoRepository.ObterPorIdAsync(evt.PedidoId);
+        if (pedido is null)
+        {
+            _logger.LogWarning("PedidoId {PedidoId} não encontrado no CatalogAPI — ignorando evento", evt.PedidoId);
+            return;
+        }
+
+        if (pedido.Status != StatusPedido.Pendente)
+        {
+            _logger.LogInformation("PedidoId {PedidoId} já processado com status {Status} — ignorando (idempotente)",
+                evt.PedidoId, pedido.Status);
+            return;
+        }
+
+        if (evt.Status == "Aprovado")
+        {
+            pedido.Status = StatusPedido.Aprovado;
+            _uow.PedidoRepository.Atualizar(pedido);
+
+            var biblioteca = await _uow.BibliotecaRepository.ObterPorUsuarioIdAsync(evt.UsuarioId);
+            if (biblioteca is not null)
+            {
+                _uow.BibliotecaRepository.AdicionarItem(new ItemBiblioteca
+                {
+                    Id = Guid.NewGuid(),
+                    BibliotecaId = biblioteca.Id,
+                    JogoId = evt.JogoId,
+                    DataAdicao = DateTime.UtcNow
+                });
+            }
+            else
+            {
+                _logger.LogWarning("Biblioteca não encontrada para UsuarioId {UsuarioId} ao aprovar PedidoId {PedidoId}",
+                    evt.UsuarioId, evt.PedidoId);
+            }
+
+            await _uow.CommitAsync(context.CancellationToken);
+
+            _logger.LogInformation("Pedido {PedidoId} aprovado. Jogo {NomeJogo} adicionado à biblioteca do usuário {UsuarioId}",
+                evt.PedidoId, evt.NomeJogo, evt.UsuarioId);
+        }
+        else
+        {
+            pedido.Status = StatusPedido.Rejeitado;
+            _uow.PedidoRepository.Atualizar(pedido);
+            await _uow.CommitAsync(context.CancellationToken);
+
+            _logger.LogInformation("Pedido {PedidoId} rejeitado. Motivo: {Motivo}",
+                evt.PedidoId, evt.Motivo ?? "não informado");
+        }
     }
 }
