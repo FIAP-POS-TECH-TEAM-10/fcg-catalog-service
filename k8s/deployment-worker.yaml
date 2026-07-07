@@ -18,7 +18,7 @@ spec:
       containers:
       - name: catalog-worker
         image: fcg-catalog-worker:latest
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Never
         env:
         - name: ConnectionStrings__DefaultConnection
           valueFrom:
