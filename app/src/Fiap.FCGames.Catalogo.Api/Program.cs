@@ -4,6 +4,7 @@ using Fiap.FCGames.Catalogo.Infra.DataProvider.Contexto;
 using Fiap.FCGames.Catalogo.Infra.DataProvider.Seed;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -66,5 +67,12 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHealthChecks("/health");
+
+// Middleware para métricas HTTP (latência, status code, etc.)
+app.UseRouting();
+app.UseHttpMetrics();
+
+// Endpoint padrão /metrics
+app.MapMetrics();
 
 await app.RunAsync();
