@@ -12,7 +12,7 @@ terraform {
   backend "s3" {
     bucket         = "fiap-tech-challenge-tfstate-123456" # Substitua pelo seu Bucket S3
     key            = "catalog-service/terraform.tfstate" # Key exclusiva deste microsserviço
-    region         = var.aws_region                          # Sua região AWS
+    region         = "sa-east-1"                          # Sua região AWS
     dynamodb_table = "fiap-tech-challenge-tflocks"        # Nome da sua tabela DynamoDB
     encrypt        = true
   }
