@@ -35,12 +35,12 @@ jobs:
 
       # Restaura e compila apontando diretamente para a API principal
       - name: Restore Dependencies
-        run: dotnet restore Fiap.FCGames.Catalogo.Api/
+        run: dotnet restore Fiap.FCGames.Catalogo.Api.slnx
         working-directory: ./app/src
 
       # 4. Execução do build
       - name: Build Project
-        run: dotnet build Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj --no-restore -c Release
+        run: dotnet build Fiap.FCGames.Catalogo.Api.slnx --no-restore -c Release
         working-directory: ./app/src
 
       # # 5. Execução dos testes unitários
