@@ -33,10 +33,14 @@ jobs:
       - name: Listar arquivos e pastas
         run: find . -name "*.csproj" -o -name "*.sln"
 
-      # 4. Compilação da aplicação em modo Release
-      - name: Build Solution
-        run: dotnet build --no-restore -c Release
-        working-directory: ./src/app
+      # Restaura e compila apontando diretamente para a API principal
+      - name: Restore Dependencies
+        run: dotnet restore Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj
+        working-directory: ./app/src
+
+      - name: Build Project
+        run: dotnet build Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj --no-restore -c Release
+        working-directory: ./app/src
 
       # # 5. Execução dos testes unitários
       # - name: Run Unit Tests
