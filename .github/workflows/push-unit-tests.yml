@@ -31,13 +31,13 @@ jobs:
 
       # Adicione este passo para investigar onde estão os arquivos do projeto
       - name: Listar arquivos e pastas
-        run: find . -name "*.csproj" -o -name "*.sln"
+        run: find . -name "*.csproj" -o -name "*.slnx"
 
-      # # Restaura e compila apontando diretamente para a API principal
-      # - name: Restore Dependencies
-      #   run: dotnet restore Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj
-      #   working-directory: ./app/src
-      
+      # Restaura e compila apontando diretamente para a API principal
+      - name: Restore Dependencies
+        run: dotnet restore Fiap.FCGames.Catalogo.Api/
+        working-directory: ./app/src
+
       # 4. Execução do build
       - name: Build Project
         run: dotnet build Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj --no-restore -c Release
