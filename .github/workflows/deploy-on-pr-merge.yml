@@ -1,32 +1,32 @@
-name: Deploy on PR Merge to Main
+name: Infrastructure and App Deploy (Main)
 
 on:
   pull_request:
     branches:
       - main
-    types:
-      - closed # Dispara quando o PR é fechado
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - main
 
 permissions:
   id-token: write
   contents: read
 
 env:
-  AWS_REGION: us-east-1
+  AWS_REGION: sa-east-1
   ROLE_TO_ASSUME: arn:aws:iam::915153720516:role/GitHubActions-ECS-Deploy-Role
   ECR_REPOSITORY: customer-service
   ECS_CLUSTER: customer-service-cluster
   ECS_SERVICE: customer-service
   CONTAINER_NAME: customer-service-container
-  WORKING_DIR: ./infra # Apontado para a pasta infra
+  WORKING_DIR: ./terraform
 
 jobs:
-  deploy-on-merge:
-    name: Apply Infra, Push Image and Deploy to ECS
-    # Só executa se o PR tiver sido realmente MESCLADO
-    if: github.event.pull_request.merged == true
+  # --- ETAPA 1: INFRAESTRUTURA & ECR (PR & MERGE) ---
+  infra-and-build:
+    name: Provision Infrastructure & Push to ECR
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -37,7 +37,7 @@ jobs:
           role-to-assume: ${{ env.ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # 1. Executa o Terraform na pasta ./infra
+      # 1. Aplicar Terraform para garantir Cluster EC2 Free Tier e Repositório ECR
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -49,13 +49,12 @@ jobs:
           terraform init
           terraform apply -auto-approve
 
-      # 2. Login no Amazon ECR
+      # 2. Build e Push da Imagem Docker no ECR
       - name: Log in to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 3. Build e Push da Imagem Docker
-      - name: Build, Tag, and Push Image to ECR
+      - name: Build and Push Docker Image
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -66,16 +65,34 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      # 4. Atualiza a Task Definition do ECS
+  # --- ETAPA 2: DEPLOY NO ECS (APENAS APÓS MERGE NA MAIN) ---
+  deploy-ecs:
+    name: Deploy Service to ECS
+    needs: infra-and-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
       - name: Render ECS Task Definition
         id: task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: .aws/task-definition.json
           container-name: ${{ env.CONTAINER_NAME }}
-          image: ${{ steps.build-image.outputs.image }}
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
 
-      # 5. Executa o Deploy no Cluster ECS
       - name: Deploy Amazon ECS Task Definition
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:

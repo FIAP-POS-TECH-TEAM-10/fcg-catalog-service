@@ -81,7 +81,7 @@ resource "aws_ecs_cluster" "main" {
 # Template que inicializa a EC2 t2.micro configurada para o Cluster
 resource "aws_launch_template" "ecs_ec2_template" {
   name_prefix   = "${var.service_name}-template-"
-  image_id      = "ami-0c101bf811a80b660" # Amazon Linux 2023 ECS-Optimized (us-east-1)
+  image_id      = "ami-0c101bf811a80b660" # Amazon Linux 2023 ECS-Optimized (sa-east-1)
   instance_type = "t2.micro"              # Elegível ao Free Tier
 
   iam_instance_profile {
