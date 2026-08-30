@@ -3,47 +3,47 @@ name: Unit Tests CI (.NET 10)
 on:
   push:
     branches:
-      - '**' # Executa em qualquer branch a cada commit/push
+      - '**'
   pull_request:
     branches:
-      - '**' # Executa em qualquer PR
+      - '**'
+
+# PERMISSÃO NECESSÁRIA PARA BAIXAR PACOTES PRIVADOS DO GITHUB PACKAGES
+permissions:
+  contents: read
+  packages: read
 
 jobs:
   test:
-    name: Run Unit Tests
+    name: Run Build and Tests
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout do código-fonte
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Configuração do SDK do .NET 10
       - name: Setup .NET 10 SDK
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+          # Configura a autenticação automática com o GitHub Packages
+          source-url: https://nuget.pkg.github.com/FIAP-POS-TECH-TEAM-10/index.json
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # # 3. Restauração das dependências NuGet no diretório src/app
-      # - name: Restore Dependencies
-      #   run: dotnet restore
-      #   working-directory: ./src/app
-
-      # Adicione este passo para investigar onde estão os arquivos do projeto
-      - name: Listar arquivos e pastas
-        run: find . -name "*.csproj" -o -name "*.slnx"
-
-      # Restaura e compila apontando diretamente para a API principal
+      # Restaura usando a solução .slnx na pasta ./app/src
       - name: Restore Dependencies
         run: dotnet restore Fiap.FCGames.Catalogo.Api.slnx
         working-directory: ./app/src
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 4. Execução do build
-      - name: Build Project
+      # Compilação em modo Release
+      - name: Build Solution
         run: dotnet build Fiap.FCGames.Catalogo.Api.slnx --no-restore -c Release
         working-directory: ./app/src
 
-      # # 5. Execução dos testes unitários
-      # - name: Run Unit Tests
-      #   run: dotnet test src/app/SuaApp.Tests.csproj --no-build -c Release --logger "trx;LogFileName=test_results.trx"
-      #   working-directory: ./src/app
+      # Execução dos testes (se houver projeto de teste na slnx)
+      - name: Run Unit Tests
+        run: dotnet test Fiap.FCGames.Catalogo.Api.slnx --no-build -c Release
+        working-directory: ./app/src
