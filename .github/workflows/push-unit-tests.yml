@@ -1,0 +1,49 @@
+# name: Unit Tests CI (.NET 10)
+
+# on:
+#   push:
+#     branches:
+#       - '**'
+#   pull_request:
+#     branches:
+#       - '**'
+
+# # PERMISSÃO NECESSÁRIA PARA BAIXAR PACOTES PRIVADOS DO GITHUB PACKAGES
+# permissions:
+#   contents: read
+#   packages: read
+
+# jobs:
+#   test:
+#     name: Run Build and Tests
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Checkout Repository
+#         uses: actions/checkout@v4
+
+#       - name: Setup .NET 10 SDK
+#         uses: actions/setup-dotnet@v4
+#         with:
+#           dotnet-version: '10.0.x'
+#           # Configura a autenticação automática com o GitHub Packages
+#           source-url: https://nuget.pkg.github.com/FIAP-POS-TECH-TEAM-10/index.json
+#         env:
+#           NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+#       # Restaura usando a solução .slnx na pasta ./app/src
+#       - name: Restore Dependencies
+#         run: dotnet restore Fiap.FCGames.Catalogo.Api.slnx
+#         working-directory: ./app/src
+#         env:
+#           NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+#       # Compilação em modo Release
+#       - name: Build Solution
+#         run: dotnet build Fiap.FCGames.Catalogo.Api.slnx --no-restore -c Release
+#         working-directory: ./app/src
+
+#       # Execução dos testes (se houver projeto de teste na slnx)
+#       - name: Run Unit Tests
+#         run: dotnet test Fiap.FCGames.Catalogo.Api.slnx --no-build -c Release
+#         working-directory: ./app/src
