@@ -7,3 +7,5 @@ data:
   jwt-issuer: "AppFiapFcGames"
   rabbitmq-host: "rabbitmq"
   aspnetcore-urls: "http://+:5002"
+  dynamodb-service-url: "http://dynamodb-local:8000"
+  dynamodb-region: "us-east-1"

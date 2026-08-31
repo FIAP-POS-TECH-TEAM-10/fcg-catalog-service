@@ -15,8 +15,7 @@ public class RemoverJogoCommandHandler : IRequestHandler<RemoverJogoCommand, Uni
         var jogo = await _uow.JogoRepository.ObterPorIdAsync(request.Id)
             ?? throw new NotFoundException($"Jogo {request.Id} não encontrado.");
 
-        _uow.JogoRepository.Remover(jogo);
-        await _uow.CommitAsync(cancellationToken);
+        await _uow.JogoRepository.RemoverAsync(jogo);
 
         return Unit.Value;
     }

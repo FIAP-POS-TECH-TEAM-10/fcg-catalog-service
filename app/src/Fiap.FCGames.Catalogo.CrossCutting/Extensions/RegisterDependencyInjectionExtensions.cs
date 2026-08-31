@@ -13,5 +13,6 @@ public static class RegisterDependencyInjectionExtensions
         services.AddScoped<IJogoRepository, JogoRepository>();
         services.AddScoped<IBibliotecaRepository, BibliotecaRepository>();
         services.AddScoped<IPedidoRepository, PedidoRepository>();
+        services.AddScoped<IDesejoRepository, DesejoRepository>();
     }
 }

@@ -1,13 +1,15 @@
+using Amazon.DynamoDBv2.DataModel;
 using Fiap.FCGames.Catalogo.Domain.Aggregates.AggregateJogo;
-using Fiap.FCGames.Catalogo.Infra.DataProvider.Contexto;
+using Fiap.FCGames.Catalogo.Infra.DataProvider.Dynamo;
 
 namespace Fiap.FCGames.Catalogo.Infra.DataProvider.Seed;
 
 public static class SeedData
 {
-    public static async Task SeedJogosAsync(FcGamesContexto context)
+    public static async Task SeedJogosAsync(IDynamoDBContext dynamoContext)
     {
-        if (context.Jogos.Any()) return;
+        var existentes = await dynamoContext.ScanAsync<JogoDocument>([]).GetRemainingAsync();
+        if (existentes.Count > 0) return;
 
         var jogos = new List<Jogo>
         {
@@ -16,7 +18,16 @@ public static class SeedData
             new() { Id = Guid.NewGuid(), Nome = "Cyberpunk 2077", Descricao = "RPG de ação em mundo aberto futurista", Preco = 149.90m, DataCadastro = DateTime.UtcNow },
         };
 
-        context.Jogos.AddRange(jogos);
-        await context.SaveChangesAsync();
+        foreach (var jogo in jogos)
+        {
+            await dynamoContext.SaveAsync(new JogoDocument
+            {
+                Id = jogo.Id.ToString(),
+                Nome = jogo.Nome,
+                Descricao = jogo.Descricao,
+                Preco = jogo.Preco,
+                DataCadastro = jogo.DataCadastro
+            });
+        }
     }
 }

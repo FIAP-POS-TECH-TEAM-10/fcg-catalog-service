@@ -1,6 +1,9 @@
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.DataModel;
 using Fiap.FCGames.Catalogo.CrossCutting.Extensions;
 using Fiap.FCGames.Catalogo.CrossCutting.Middleware;
 using Fiap.FCGames.Catalogo.Infra.DataProvider.Contexto;
+using Fiap.FCGames.Catalogo.Infra.DataProvider.Dynamo;
 using Fiap.FCGames.Catalogo.Infra.DataProvider.Seed;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -26,6 +29,8 @@ builder.Services.AddAutorizacaoApi();
 
 builder.Services.AddContextDatabase(builder.Configuration);
 
+builder.Services.AddDynamoDb(builder.Configuration);
+
 builder.Services.AddMassTransitRabbitMq(builder.Configuration);
 
 builder.Services.AddHealthChecks();
@@ -45,7 +50,13 @@ if (!app.Environment.IsEnvironment("Testing"))
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<FcGamesContexto>();
     dbContext.Database.Migrate();
-    await SeedData.SeedJogosAsync(dbContext);
+
+    var dynamoClient = scope.ServiceProvider.GetRequiredService<IAmazonDynamoDB>();
+    await DynamoDbInitializer.EnsureJogosTableExistsAsync(dynamoClient);
+    await DynamoDbInitializer.EnsureDesejosTableExistsAsync(dynamoClient);
+
+    var dynamoContext = scope.ServiceProvider.GetRequiredService<IDynamoDBContext>();
+    await SeedData.SeedJogosAsync(dynamoContext);
 }
 
 app.UseCorrelationId();

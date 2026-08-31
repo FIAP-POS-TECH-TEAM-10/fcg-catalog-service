@@ -19,8 +19,7 @@ public class AtualizarJogoCommandHandler : IRequestHandler<AtualizarJogoCommand,
         jogo.Descricao = request.Descricao;
         jogo.Preco = request.Preco;
 
-        _uow.JogoRepository.Atualizar(jogo);
-        await _uow.CommitAsync(cancellationToken);
+        await _uow.JogoRepository.AtualizarAsync(jogo);
 
         return Unit.Value;
     }
