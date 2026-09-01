@@ -1,6 +1,7 @@
 name: Infrastructure and App Deploy (Main)
 
 on:
+
   pull_request:
     branches:
       - main
@@ -10,8 +11,9 @@ on:
       - main
 
 permissions:
-  id-token: write
-  contents: read
+  id-token: write # Necessário para autenticação via OIDC na AWS
+  contents: read  # Permite checkout do código
+  packages: read  # Permite baixar pacotes privados do GitHub Packages
 
 env:
   AWS_REGION: sa-east-1
@@ -23,9 +25,11 @@ env:
   WORKING_DIR: ./infra
 
 jobs:
-  # --- ETAPA 1: INFRAESTRUTURA & ECR (PR & MERGE) ---
+  # --- ETAPA 1: INFRAESTRUTURA & ECR (APENAS SE O PR FOR MERGED OU PUSH DIRETO) ---
   infra-and-build:
     name: Provision Infrastructure & Push to ECR
+    # Trava de segurança: executa em push direto ou apenas se o PR foi MERGED
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -37,7 +41,7 @@ jobs:
           role-to-assume: ${{ env.ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # 1. Aplicar Terraform para garantir Cluster EC2 Free Tier e Repositório ECR
+      # 1. Aplicar Terraform para garantir Cluster EC2 e Repositório ECR
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -49,7 +53,7 @@ jobs:
           terraform init
           terraform apply -auto-approve
         env:
-          AWS_EC2_METADATA_DISABLED: "true" # Evita que o SDK da AWS tente buscar IMDSv2 local no runner do GitHub          
+          AWS_EC2_METADATA_DISABLED: "true" # Evita travamento/retry do SDK no runner
 
       # 2. Build e Push da Imagem Docker no ECR
       - name: Log in to Amazon ECR
@@ -62,16 +66,19 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker build \
+            --build-arg GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-  # --- ETAPA 2: DEPLOY NO ECS (APENAS APÓS MERGE NA MAIN) ---
+  # --- ETAPA 2: DEPLOY NO ECS ---
   deploy-ecs:
     name: Deploy Service to ECS
     needs: infra-and-build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
