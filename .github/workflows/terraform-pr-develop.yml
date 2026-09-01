@@ -6,7 +6,7 @@ on:
       - develop
     types: [opened, synchronize, reopened]      
     paths:
-      - 'infra/**' # Monitora alterações na pasta infra
+      - '*/**' # Monitora alterações
 
 permissions:
   id-token: write
