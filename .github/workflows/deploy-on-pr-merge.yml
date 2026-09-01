@@ -27,9 +27,7 @@ env:
 jobs:
   # --- ETAPA 1: INFRAESTRUTURA & ECR (APENAS SE O PR FOR MERGED OU PUSH DIRETO) ---
   infra-and-build:
-    name: Provision Infrastructure & Push to ECR
-    # Trava de segurança: executa em push direto ou apenas se o PR foi MERGED
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    name: Provision Infrastructure & Push to ECR    
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
