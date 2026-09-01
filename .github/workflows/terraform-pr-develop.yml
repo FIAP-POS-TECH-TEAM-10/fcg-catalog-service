@@ -43,6 +43,8 @@ jobs:
 
       - name: Terraform Init
         run: terraform init
+        env:
+          AWS_EC2_METADATA_DISABLED: "true" # Resolve a falha do PutObject/S3 no runner        
 
       - name: Terraform Plan
         id: plan

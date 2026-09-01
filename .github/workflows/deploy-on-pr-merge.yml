@@ -48,6 +48,8 @@ jobs:
           cd ${{ env.WORKING_DIR }}
           terraform init
           terraform apply -auto-approve
+        env:
+          AWS_EC2_METADATA_DISABLED: "true" # Evita que o SDK da AWS tente buscar IMDSv2 local no runner do GitHub          
 
       # 2. Build e Push da Imagem Docker no ECR
       - name: Log in to Amazon ECR
