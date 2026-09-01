@@ -14,6 +14,15 @@ COPY nuget.config .
 COPY app/src/ app/src/
 
 WORKDIR /src/app/src
+
+# Cria ou configura o nuget.config para autenticação no feed da organização
+RUN dotnet nuget add source "https://nuget.pkg.github.com/FIAP-POS-TECH-TEAM-10/index.json" \
+    --name "GitHubPackages" \
+    --username "GitHubAction" \
+    --password "${GITHUB_TOKEN}" \
+    --store-password-in-clear-text \
+    --valid-authentication-types "basic"
+
 RUN dotnet restore Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj
 
 RUN dotnet publish Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj \
