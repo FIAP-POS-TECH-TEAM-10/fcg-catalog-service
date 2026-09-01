@@ -28,7 +28,7 @@ RUN --mount=type=secret,id=GITHUB_TOKEN \
     export NUGET_AUTH_TOKEN=$(cat /run/secrets/GITHUB_TOKEN) && \
     dotnet restore Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj    
 
-RUN dotnet restore Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj
+#RUN dotnet restore Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj
 
 # RUN dotnet publish Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj \
 #     -c Release \
