@@ -93,7 +93,7 @@ data "aws_ami" "ecs_optimized" {
 resource "aws_launch_template" "ecs_ec2_template" {
   name_prefix   = "${var.service_name}-template-"
   image_id      = data.aws_ami.ecs_optimized.id # Usando a AMI obtida dinamicamente
-  instance_type = "t2.micro"              # Elegível ao Free Tier
+  instance_type = "t3.micro" # Ajustado de t2.micro para t3.micro (Free Tier em sa-east-1)
 
   iam_instance_profile {
     name = aws_iam_instance_profile.ecs_instance_profile.name
