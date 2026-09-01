@@ -20,7 +20,7 @@ env:
   ECS_CLUSTER: customer-service-cluster
   ECS_SERVICE: customer-service
   CONTAINER_NAME: customer-service-container
-  WORKING_DIR: ./terraform
+  WORKING_DIR: ./infra
 
 jobs:
   # --- ETAPA 1: INFRAESTRUTURA & ECR (PR & MERGE) ---
