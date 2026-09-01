@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - develop
+    types: [opened, synchronize, reopened]      
     paths:
       - 'infra/**' # Monitora alterações na pasta infra
 
