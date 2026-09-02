@@ -156,7 +156,7 @@ resource "aws_ecs_task_definition" "app" {
   container_definitions = jsonencode([
     {
       name      = "${var.service_name}-container"
-      image     = "${aws_ecr_repository.app.repository_url}:latest"
+      image     = "${aws_ecr_repository.app_repo.repository_url}:latest"
       cpu       = 256
       memory    = 256
       essential = true
