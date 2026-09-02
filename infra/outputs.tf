@@ -7,3 +7,8 @@ output "ecs_cluster_name" {
   value       = aws_ecs_cluster.main.name
   description = "Nome do Cluster ECS criado"
 }
+
+output "ecs_service_name" {
+  value       = aws_ecs_service.app.name
+  description = "Nome do Service ECS que o GitHub Actions atualiza a cada deploy"
+}
