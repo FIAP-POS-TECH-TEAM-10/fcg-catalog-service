@@ -131,3 +131,42 @@ resource "aws_autoscaling_group" "ecs_asg" {
     propagate_at_launch = true
   }
 }
+
+# Recurso para registrar e executar a Task no Cluster ECS
+resource "aws_ecs_service" "main" {
+  name            = var.service_name # Deve ser "fcg-catalog-service"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.app.arn
+  desired_count   = 1
+  launch_type     = "EC2"
+
+  lifecycle {
+    ignore_changes = [task_definition] # Impede que o Terraform sobrescreva as revisões de imagem feitas pelo GitHub Actions
+  }
+}
+
+# Task Definition inicial gerenciada pelo Terraform
+resource "aws_ecs_task_definition" "app" {
+  family                = "${var.service_name}-task"
+  network_mode          = "bridge"
+  requires_compatibilities = ["EC2"]
+  cpu                   = "256"
+  memory                = "256"
+
+  container_definitions = jsonencode([
+    {
+      name      = "${var.service_name}-container"
+      image     = "${aws_ecr_repository.app_repo.repository_url}:latest"
+      cpu       = 256
+      memory    = 256
+      essential = true
+      portMappings = [
+        {
+          containerPort = 5002
+          hostPort      = 5002
+          protocol      = "tcp"
+        }
+      ]
+    }
+  ])
+}
