@@ -1,19 +1,44 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-ARG NUGET_AUTH_TOKEN
-ENV NUGET_AUTH_TOKEN=$NUGET_AUTH_TOKEN
+# Recebe o token enviado pelo GitHub Actions durante o build
+ARG GITHUB_TOKEN
+
+# Configura as variáveis de ambiente que o nuget.config utiliza
+ENV NUGET_AUTH_TOKEN=${GITHUB_TOKEN}
+
+# ARG NUGET_AUTH_TOKEN
+# ENV NUGET_AUTH_TOKEN=$NUGET_AUTH_TOKEN
 
 COPY nuget.config .
 COPY app/src/ app/src/
 
 WORKDIR /src/app/src
-RUN dotnet restore Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj
 
-RUN dotnet publish Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj \
-    -c Release \
-    -o /app/publish \
-    --no-restore
+# # Cria ou configura o nuget.config para autenticação no feed da organização
+# RUN dotnet nuget add source "https://nuget.pkg.github.com/FIAP-POS-TECH-TEAM-10/index.json" \
+#     --name "GitHubPackages" \
+#     --username "GitHubAction" \
+#     --password "${GITHUB_TOKEN}" \
+#     --store-password-in-clear-text \
+#     --valid-authentication-types "basic"
+
+# Utiliza o secret montado dinamicamente para autenticar o restore sem expor o token
+RUN --mount=type=secret,id=GITHUB_TOKEN \
+    export NUGET_AUTH_TOKEN=$(cat /run/secrets/GITHUB_TOKEN) && \
+    dotnet restore Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj    
+
+#RUN dotnet restore Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj
+
+# RUN dotnet publish Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj \
+#     -c Release \
+#     -o /app/publish \
+#     --no-restore
+
+# Compila e publica a aplicação
+RUN --mount=type=secret,id=GITHUB_TOKEN \
+    export NUGET_AUTH_TOKEN=$(cat /run/secrets/GITHUB_TOKEN) && \
+    dotnet publish Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj -c Release -o /app/publish /p:UseAppHost=false    
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
