@@ -9,6 +9,6 @@ output "ecs_cluster_name" {
 }
 
 output "ecs_service_name" {
-  value       = aws_ecs_service.app.name
+  value       = aws_ecs_service.main.name
   description = "Nome do Service ECS que o GitHub Actions atualiza a cada deploy"
 }
