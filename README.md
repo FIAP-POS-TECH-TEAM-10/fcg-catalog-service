@@ -10,6 +10,7 @@ os quatro microsserviços na jornada de compra.
 
 ---
 
+
 ## Arquitetura
 
 ```
