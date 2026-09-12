@@ -12,3 +12,8 @@ output "ecs_service_name" {
   value       = aws_ecs_service.main.name
   description = "Nome do Service ECS que o GitHub Actions atualiza a cada deploy"
 }
+
+output "ecs_security_group_id" {
+  description = "ID do Security Group associado às instâncias do ECS"
+  value       = aws_security_group.ecs_sg.id
+}

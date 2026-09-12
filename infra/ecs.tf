@@ -18,6 +18,14 @@ resource "aws_security_group" "ecs_sg" {
   description = "Permite trafego de entrada para o container ECS"
   vpc_id      = data.aws_vpc.default.id
 
+  # Libera portas dinâmicas alocadas pelo ECS no modo bridge (32768-61000)
+  ingress {
+    from_port   = 32768
+    to_port     = 61000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   # Libera a porta da aplicação para o mundo (Estudos)
   ingress {
     from_port   = var.app_port
@@ -44,8 +52,14 @@ resource "aws_security_group" "ecs_sg" {
 }
 
 # ------------------------------------------------------------------------------
-# 2. ROLES IAM DO ECS E DA INSTÂNCIA EC2
+# 2. CLOUDWATCH LOGS & PERMISSÕES IAM DO ECS
 # ------------------------------------------------------------------------------
+
+# Grupo de logs para capturar stdout/stderr das tasks do ECS
+resource "aws_cloudwatch_log_group" "ecs_logs" {
+  name              = "/ecs/${var.service_name}"
+  retention_in_days = 7
+}
 
 # Permite que a instância EC2 se comunique com o ECS Control Plane
 resource "aws_iam_role" "ecs_instance_role" {
@@ -66,10 +80,17 @@ resource "aws_iam_role_policy_attachment" "ecs_instance_role_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
 }
 
+# Permite que a instância EC2 crie e envie streams para o CloudWatch Logs
+resource "aws_iam_role_policy_attachment" "ecs_cloudwatch_policy" {
+  role       = aws_iam_role.ecs_instance_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
+}
+
 resource "aws_iam_instance_profile" "ecs_instance_profile" {
   name = "${var.service_name}-ecs-instance-profile"
   role = aws_iam_role.ecs_instance_role.name
 }
+
 
 # ------------------------------------------------------------------------------
 # 3. CLUSTER ECS + LAUNCH TEMPLATE + AUTO SCALING GROUP (FREE TIER)
@@ -78,7 +99,7 @@ resource "aws_ecs_cluster" "main" {
   name = var.cluster_name
 }
 
-# Busca dinamicamente a AMI Amazon Linux 2023 ECS-Optimized mais recente da região
+# Busca dinamicamente a AMI ECS-Optimized para x86_64
 data "aws_ami" "ecs_optimized" {
   most_recent = true
   owners      = ["amazon"]
@@ -132,19 +153,6 @@ resource "aws_autoscaling_group" "ecs_asg" {
   }
 }
 
-# Recurso para registrar e executar a Task no Cluster ECS
-resource "aws_ecs_service" "main" {
-  name            = var.service_name # Deve ser "fcg-catalog-service"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.app.arn
-  desired_count   = 1
-  launch_type     = "EC2"
-
-  lifecycle {
-    ignore_changes = [task_definition] # Impede que o Terraform sobrescreva as revisões de imagem feitas pelo GitHub Actions
-  }
-}
-
 # Task Definition inicial gerenciada pelo Terraform
 resource "aws_ecs_task_definition" "app" {
   family                = "${var.service_name}-task"
@@ -163,10 +171,44 @@ resource "aws_ecs_task_definition" "app" {
       portMappings = [
         {
           containerPort = 5002
-          hostPort      = 0
+          hostPort      = 5002
           protocol      = "tcp"
         }
       ]
+
+      # VARIÁVEIS DE AMBIENTE PARA DIAGNÓSTICO DO .NET NO LINUX
+      environment = [
+        { name = "ASPNETCORE_ENVIRONMENT", value = "Development" }, # Revela mais logs no startup
+        { name = "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", value = "1" }, # Evita crash por falta de ICU/locales no Linux
+        { name = "DOTNET_USE_POLLING_FILE_WATCHER", value = "true" }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.ecs_logs.name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
+
+
     }
   ])
+}
+
+# Recurso para registrar e executar a Task no Cluster ECS
+resource "aws_ecs_service" "main" {
+  name            = var.service_name # Deve ser "fcg-catalog-service"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.app.arn
+  desired_count   = 1
+  launch_type     = "EC2"
+
+  # Permite que a capacidade caia para 0 durante o deploy para liberar a porta fixa
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 100    
+
+  lifecycle {
+    ignore_changes = [task_definition] # Impede que o Terraform sobrescreva as revisões de imagem feitas pelo GitHub Actions
+  }
 }

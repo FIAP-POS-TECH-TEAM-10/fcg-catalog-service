@@ -15,25 +15,11 @@ COPY app/src/ app/src/
 
 WORKDIR /src/app/src
 
-# # Cria ou configura o nuget.config para autenticação no feed da organização
-# RUN dotnet nuget add source "https://nuget.pkg.github.com/FIAP-POS-TECH-TEAM-10/index.json" \
-#     --name "GitHubPackages" \
-#     --username "GitHubAction" \
-#     --password "${GITHUB_TOKEN}" \
-#     --store-password-in-clear-text \
-#     --valid-authentication-types "basic"
 
 # Utiliza o secret montado dinamicamente para autenticar o restore sem expor o token
 RUN --mount=type=secret,id=GITHUB_TOKEN \
     export NUGET_AUTH_TOKEN=$(cat /run/secrets/GITHUB_TOKEN) && \
     dotnet restore Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj    
-
-#RUN dotnet restore Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj
-
-# RUN dotnet publish Fiap.FCGames.Catalogo.Api/Fiap.FCGames.Catalogo.Api.csproj \
-#     -c Release \
-#     -o /app/publish \
-#     --no-restore
 
 # Compila e publica a aplicação
 RUN --mount=type=secret,id=GITHUB_TOKEN \
@@ -43,9 +29,12 @@ RUN --mount=type=secret,id=GITHUB_TOKEN \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# curl é necessário para o HEALTHCHECK do docker-compose / k8s (não vem na imagem aspnet).
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
+# Instala bibliotecas nativas de internacionalizacao e suporte a timezone
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    icu-devtools \
+    libicu-dev \
+    && rm -rf /var/lib/apt/lists/*        
 
 EXPOSE 5002
 
