@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Serilog;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -98,5 +99,12 @@ app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("live")
 });
+
+// Middleware para métricas HTTP (latência, status code, etc.)
+app.UseRouting();
+app.UseHttpMetrics();
+
+// Endpoint padrão /metrics
+app.MapMetrics();
 
 await app.RunAsync();
