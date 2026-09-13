@@ -29,7 +29,7 @@ builder.Services.AddAutorizacaoApi();
 
 builder.Services.AddContextDatabase(builder.Configuration);
 
-builder.Services.AddMassTransitRabbitMq(builder.Configuration);
+builder.Services.AddMassTransitMessaging(builder.Configuration);
 
 builder.Services.AddHealthChecks()
     // Check "self": sempre saudável, não depende de RabbitMQ/MassTransit — usado pelo
