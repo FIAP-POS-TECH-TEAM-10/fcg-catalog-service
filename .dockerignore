@@ -4,3 +4,9 @@
 **/*.user
 .git
 .gitignore
+.github
+infra
+.aws
+**/bin
+**/obj
+**/node_modules
