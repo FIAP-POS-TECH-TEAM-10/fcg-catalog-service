@@ -34,6 +34,8 @@ builder.Services.AddContextDatabase(builder.Configuration);
 
 builder.Services.AddDynamoDb(builder.Configuration);
 
+builder.Services.AddRedisCache(builder.Configuration);
+
 builder.Services.AddMassTransitMessaging(builder.Configuration);
 
 builder.Services.AddHealthChecks()
