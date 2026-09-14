@@ -58,6 +58,26 @@ spec:
             configMapKeyRef:
               name: catalog-api-config
               key: jwt-issuer
+        - name: DynamoDb__ServiceUrl
+          valueFrom:
+            configMapKeyRef:
+              name: catalog-api-config
+              key: dynamodb-service-url
+        - name: DynamoDb__Region
+          valueFrom:
+            configMapKeyRef:
+              name: catalog-api-config
+              key: dynamodb-region
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: catalog-api-secret
+              key: aws-access-key-id
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: catalog-api-secret
+              key: aws-secret-access-key
         volumeMounts:
         - name: catalog-data
           mountPath: /data

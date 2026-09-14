@@ -21,8 +21,7 @@ public class CriarJogoCommandHandler : IRequestHandler<CriarJogoCommand, CriarJo
             DataCadastro = DateTime.UtcNow
         };
 
-        _uow.JogoRepository.Adicionar(jogo);
-        await _uow.CommitAsync(cancellationToken);
+        await _uow.JogoRepository.AdicionarAsync(jogo);
 
         return new CriarJogoResponse(jogo.Id, jogo.Nome, jogo.Descricao, jogo.Preco, jogo.DataCadastro);
     }
