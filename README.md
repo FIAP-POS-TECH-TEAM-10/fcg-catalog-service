@@ -86,10 +86,11 @@ Liveness/readiness probe. **Response 200:** `{ "status": "Healthy" }`
 
 ## Banco de Dados
 
-**catalog-db** (SQLite):
+**catalog-db** (SQLite) — só as entidades transacionais; `Jogo` e `Desejo` (wishlist)
+foram migradas para o **DynamoDB** (tabelas `Jogos` e `Desejos`, ver
+`Infra/DataProvider/Dynamo`), não vivem mais aqui:
 
 ```sql
-Jogos(Id PK, Nome, Descricao, Preco, DataCadastro)
 Bibliotecas(Id PK, UsuarioId UNIQUE, CriadaEm)
 ItensBiblioteca(Id PK, BibliotecaId FK, JogoId, DataAdicao, UNIQUE(BibliotecaId, JogoId))
 Pedidos(Id PK, UsuarioId, JogoId, Preco, Status INTEGER, CriadoEm)  -- Status: 0=Pendente,1=Aprovado,2=Rejeitado
