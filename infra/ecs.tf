@@ -153,6 +153,45 @@ resource "aws_iam_role_policy" "ecs_task_sqs_sns" {
   })
 }
 
+# O app usa DynamoDB pra Jogos/Desejos (DynamoDbInitializer + JogoRepository/DesejoRepository) —
+# a Task Role não tinha NENHUMA permissão de dynamodb, o que travava o startup: ele chama
+# ListTables (não aceita restrição por ARN, precisa Resource "*") pra checar se a tabela já
+# existe, cria se não existir e fica num loop de DescribeTable esperando ficar ACTIVE — sem
+# permissão, essas chamadas falham/travam antes do Kestrel começar a escutar (por isso
+# ECS mostrava a task "RUNNING" mas a porta nunca respondia).
+resource "aws_iam_role_policy" "ecs_task_dynamodb" {
+  name = "${var.service_name}-task-dynamodb"
+  role = aws_iam_role.ecs_task_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "ListTables"
+        Effect   = "Allow"
+        Action   = ["dynamodb:ListTables"]
+        Resource = "*"
+      },
+      {
+        Sid    = "TableCrud"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:CreateTable", "dynamodb:DescribeTable",
+          "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem",
+          "dynamodb:Query", "dynamodb:Scan",
+          "dynamodb:BatchGetItem", "dynamodb:BatchWriteItem"
+        ]
+        Resource = [
+          "arn:aws:dynamodb:${var.aws_region}:*:table/Jogos",
+          "arn:aws:dynamodb:${var.aws_region}:*:table/Jogos/index/*",
+          "arn:aws:dynamodb:${var.aws_region}:*:table/Desejos",
+          "arn:aws:dynamodb:${var.aws_region}:*:table/Desejos/index/*"
+        ]
+      }
+    ]
+  })
+}
+
 # ------------------------------------------------------------------------------
 # 3. CLUSTER ECS + LAUNCH TEMPLATE + AUTO SCALING GROUP (FREE TIER)
 # ------------------------------------------------------------------------------
