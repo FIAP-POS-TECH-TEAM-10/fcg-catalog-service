@@ -285,6 +285,11 @@ resource "aws_ecs_task_definition" "app" {
           protocol      = "tcp"
         }
       ]
+      # Modo bridge: cada container da task tem seu PRÓPRIO "localhost" — sem `links`
+      # o app não consegue resolver o container do Redis pelo nome (nem por localhost).
+      # Nome literal (não var.service_name) pra casar com o container "fcg-catalog-redis"
+      # abaixo — só ele usa esse nome fixo, não o padrão "${var.service_name}-*".
+      links = ["fcg-catalog-redis"]
       mountPoints = [
         {
           sourceVolume  = "${var.service_name}-data"
@@ -304,6 +309,8 @@ resource "aws_ecs_task_definition" "app" {
       # VARIÁVEIS DE AMBIENTE PARA DIAGNÓSTICO DO .NET NO LINUX
       environment = [
         { name = "ConnectionStrings__DefaultConnection", value = "Data Source=/data/catalog.db" },
+        # Nome do container (via `links` acima), não "localhost" — ver comentário do `links`.
+        { name = "ConnectionStrings__Redis", value = "fcg-catalog-redis:6379" },
         { name = "ASPNETCORE_ENVIRONMENT", value = "Development" },      # Revela mais logs no startup
         { name = "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", value = "1" }, # Evita crash por falta de ICU/locales no Linux
         { name = "DOTNET_USE_POLLING_FILE_WATCHER", value = "true" },
@@ -320,6 +327,33 @@ resource "aws_ecs_task_definition" "app" {
       }
 
 
+    },
+    {
+      # Cache do CriarJogoCommandHandler (invalidação via Redis) — só existia no
+      # .aws/task-definition.json gerenciado pelo CI, nunca declarado aqui no Terraform
+      # (drift causado por `lifecycle.ignore_changes = [task_definition]` no service:
+      # o service nunca voltou a apontar pra uma revisão gerada por este resource desde
+      # que o container foi adicionado direto no JSON).
+      name      = "fcg-catalog-redis"
+      image     = "public.ecr.aws/docker/library/redis:alpine"
+      cpu       = 64
+      memory    = 128
+      essential = false
+      portMappings = [
+        {
+          containerPort = 6379
+          hostPort      = 6379
+          protocol      = "tcp"
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.ecs_logs.name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "redis"
+        }
+      }
     },
     {
       # Consumer MassTransit (UsuarioCriadoEvento, PagamentoProcessadoEvento) —
