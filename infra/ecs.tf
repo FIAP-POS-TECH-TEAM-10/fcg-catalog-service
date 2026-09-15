@@ -347,7 +347,8 @@ resource "aws_ecs_task_definition" "app" {
         { name = "ConnectionStrings__DefaultConnection", value = "Data Source=/data/catalog.db" },
         { name = "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", value = "1" },
         { name = "Messaging__Provider", value = "Sqs" },
-        { name = "AWS__Region", value = var.aws_region }
+        { name = "AWS__Region", value = var.aws_region },
+        { name = "DynamoDb__Region", value = var.aws_region }
       ]
       logConfiguration = {
         logDriver = "awslogs"
