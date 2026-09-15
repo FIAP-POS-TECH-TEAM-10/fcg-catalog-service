@@ -17,6 +17,10 @@ builder.Services.AddSerilog();
 
 builder.Services.RegisterDI();
 builder.Services.AddContextDatabase(builder.Configuration);
+// IUnitOfWork agrega JogoRepository/DesejoRepository, que dependem de IDynamoDBContext —
+// sem isso o DI falha ao resolver QUALQUER consumer (mesmo um que só usa Pedido/
+// Biblioteca), porque IUnitOfWork inteiro precisa ser construído de uma vez.
+builder.Services.AddDynamoDb(builder.Configuration);
 
 // Transporte escolhido pela config (Messaging:Provider=Sqs usa Amazon SQS/SNS na AWS;
 // senão, se RabbitMQ:Host estiver definido, usa RabbitMQ como hoje — local/docker-compose).
