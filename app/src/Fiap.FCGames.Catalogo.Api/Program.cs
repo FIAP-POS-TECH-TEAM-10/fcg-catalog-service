@@ -80,6 +80,14 @@ app.UseErrorHandlingMiddleware();
 
 app.UseHttpsRedirection();
 
+// UseRouting() precisa vir antes de UseAuthentication()/UseAuthorization() e de
+// qualquer Map*() — senão o ASP.NET Core lança "a middleware was not found that
+// supports authorization" nos endpoints com [Authorize] assim que a rota casa.
+app.UseRouting();
+// Middleware de métricas HTTP (latência, status code, etc.) — depois de UseRouting()
+// para já ter o endpoint casado, antes dos Map*() para medir toda requisição.
+app.UseHttpMetrics();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -112,10 +120,6 @@ app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("live")
 });
-
-// Middleware para métricas HTTP (latência, status code, etc.)
-app.UseRouting();
-app.UseHttpMetrics();
 
 // Endpoint padrão /metrics
 app.MapMetrics();
