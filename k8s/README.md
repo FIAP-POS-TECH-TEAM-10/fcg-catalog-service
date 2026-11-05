@@ -56,6 +56,18 @@ kubectl logs -n fcgames -l app=catalog-worker -f
 
 **IMPORTANTE**: Altere os valores dos Secrets em produção!
 
+O `secret.yaml` versionado é só um **modelo** (valores `REPLACE_ME`). Crie o Secret real com as suas credenciais:
+
+```bash
+kubectl create secret generic catalog-api-secret -n fcgames \
+  --from-literal=jwt-key="$JWT__KEY" \
+  --from-literal=db-connection="Data Source=/data/catalog.db" \
+  --from-literal=rabbitmq-username="$RABBITMQ__USERNAME" \
+  --from-literal=rabbitmq-password="$RABBITMQ__PASSWORD" \
+  --from-literal=aws-access-key-id="local" \
+  --from-literal=aws-secret-access-key="local"
+```
+
 ## Acesso
 
 ### Port Forward para acesso local

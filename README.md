@@ -135,12 +135,14 @@ entregue ao broker em background (não se perde se o RabbitMQ estiver fora).
 | `JWT__ISSUER` | Issuer validado no token | `AppFiapFcGames` |
 | `ConnectionStrings__DefaultConnection` | Connection string do banco | `Data Source=/data/catalog.db` |
 | `RabbitMQ__Host` | Host do RabbitMQ (usado se `Messaging__Provider` não for `Sqs`) | `rabbitmq` |
-| `RabbitMQ__Username` | Usuário RabbitMQ | `guest` |
-| `RabbitMQ__Password` | Senha RabbitMQ | `guest` |
+| `RabbitMQ__Username` | Usuário RabbitMQ | defina no ambiente (sem padrão) |
+| `RabbitMQ__Password` | Senha RabbitMQ | defina no ambiente (sem padrão) |
 | `Messaging__Provider` | `Sqs` usa Amazon SQS/SNS (deploy AWS). Vazio + `RabbitMQ__Host` → RabbitMQ. Nenhum dos dois → in-memory | `Sqs` |
 | `AWS__Region` | Região usada pelo transporte SQS/SNS quando `Messaging__Provider=Sqs` | `sa-east-1` |
 
 > **Segredos nunca devem estar no `appsettings.json` de produção.** Use env vars ou Kubernetes secrets.
+
+> **Rodando fora do docker-compose:** exporte `JWT__KEY`, `RABBITMQ__USERNAME` e `RABBITMQ__PASSWORD` (não há valores padrão no código nem nos `appsettings`; o compose do `fcg-orchestration` os injeta a partir do `.env`).
 
 > **Mensageria:** o transporte é escolhido em runtime (`AddMassTransitMessaging` na Api, mesmo padrão
 > inline no `Worker/Program.cs`) — os consumers e o código de aplicação não mudam entre RabbitMQ e SQS.
@@ -177,7 +179,7 @@ dotnet run --project Fiap.FCGames.Catalogo.Worker
 ### RabbitMQ via Docker (rápido)
 ```bash
 docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
-# Management UI: http://localhost:15672 (guest/guest)
+# Management UI: http://localhost:15672 (usuário e senha definidos em `RABBITMQ__USERNAME`/`RABBITMQ__PASSWORD`)
 ```
 
 > Para subir a stack completa (todos os serviços + RabbitMQ), use o repositório

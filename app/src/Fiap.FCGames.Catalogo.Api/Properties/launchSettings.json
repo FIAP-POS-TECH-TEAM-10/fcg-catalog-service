@@ -8,12 +8,9 @@
       "applicationUrl": "http://localhost:5002",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "JWT__KEY": "ChaveSegredoLocalDesenvolvimento1234567890Ab",
         "JWT__ISSUER": "AppFiapFcGames",
         "ConnectionStrings__DefaultConnection": "Data Source=fcgames.db",
-        "RabbitMQ__Host": "localhost",
-        "RabbitMQ__Username": "guest",
-        "RabbitMQ__Password": "guest"
+        "RabbitMQ__Host": "localhost"
       }
     }
   }
