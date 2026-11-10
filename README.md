@@ -1,241 +1,83 @@
-# fcg-catalog-api
+# fcg-catalog-service (CatalogAPI + Worker)
 
-Microsserviço de catálogo do projeto FCGames — Tech Challenge FIAP Fase 2.
-
-Responsável pelo CRUD de jogos, pela biblioteca do usuário e pela orquestração da
-compra (inicia o fluxo assíncrono de pagamento via RabbitMQ). É o serviço que **conecta**
-os quatro microsserviços na jornada de compra.
-
-> Pasta local: `fcg-catalog-service` · Repositório GitHub: `fcg-catalog-api`
-
----
-
-
-## Arquitetura
-
-```
-Fiap.FCGames.Catalogo.Api        — HTTP :5002  (jogos, compras, biblioteca + health)
-Fiap.FCGames.Catalogo.Worker     — Worker Service (consumers RabbitMQ)
-Fiap.FCGames.Catalogo.Domain     — Jogo, Biblioteca, ItemBiblioteca, Pedido + enum StatusPedido
-Fiap.FCGames.Catalogo.Infra      — EF Core, repositories, migrations
-Fiap.FCGames.Catalogo.Application — Commands/Queries (CQRS/MediatR)
-Fiap.FCGames.Catalogo.CrossCutting — JWT, Swagger, Serilog, MassTransit extensions
-```
-
-### Fluxo de mensagens
-
-```
-UsersAPI
-  └── publica UsuarioCriadoEvento
-        └── [fila: catalog-usuario-criado]
-              └── Catalog.Worker cria a Biblioteca vazia (idempotente por UsuarioId)
-
-Cliente → POST /compras
-  └── Catalog.Api cria Pedido(Pendente) + grava evento no Outbox (mesma transação)
-        └── publica PedidoRealizadoEvento
-              └── PaymentsAPI processa e publica PagamentoProcessadoEvento
-                    └── [fila: catalog-pagamento-processado]
-                          └── Catalog.Worker consome (Inbox/dedup)
-                                ├── Aprovado → Pedido=Aprovado + ItemBiblioteca
-                                └── Rejeitado → Pedido=Rejeitado
-```
-
----
+Jogos, lista de desejos, compras e biblioteca do usuário. A API inicia a compra publicando
+`PedidoRealizadoEvento`; o worker consome os eventos de usuário criado e de pagamento processado.
+Só valida o JWT emitido pelo users (o `UsuarioId` vem do token).
 
 ## Endpoints
 
-### `GET /jogos` — [Authorize]
-Lista o catálogo de jogos.
+| Endpoint | Acesso | O que faz |
+|---|---|---|
+| `GET /jogos` | autenticado | lista jogos |
+| `POST /jogos` · `PUT /jogos/{id}` · `DELETE /jogos/{id}` | Admin | cadastra, atualiza, remove |
+| `POST /compras` | autenticado | cria pedido `Pendente`, publica `PedidoRealizadoEvento`, responde 202 com `orderId` |
+| `GET /compras/{orderId}` | autenticado | status do pedido: `Pendente`, `Aprovado` ou `Rejeitado` |
+| `GET /biblioteca/{usuarioId}` | autenticado | jogos do usuário |
+| `GET /desejos` · `POST /desejos` · `DELETE /desejos/{jogoId}` | autenticado | lista de desejos |
+| `GET /health` · `GET /health/live` | anônimo | health checks |
+| `GET /metrics` | anônimo | métricas Prometheus |
 
-### `POST /jogos` — [Authorize Admin]
-Cadastra um jogo. **Response 201** com o `id` gerado.
-```json
-{ "nome": "Hades", "descricao": "Roguelike", "preco": 49.90 }
-```
-
-### `PUT /jogos/{id}` — [Authorize Admin]
-Atualiza um jogo. `404` se não existir.
-
-### `DELETE /jogos/{id}` — [Authorize Admin]
-Remove um jogo. `404` se não existir.
-
-### `POST /compras` — [Authorize]
-Inicia a compra (fluxo assíncrono). O `UsuarioId` vem do JWT, não do body.
-```json
-{ "jogoId": "guid-do-jogo" }
-```
-Comportamento: valida jogo (`404`) e duplicidade (`409`) → cria `Pedido(Pendente)` →
-publica `PedidoRealizadoEvento` (via Outbox) → **Response 202**.
-```json
-{ "orderId": "guid", "jogoId": "guid", "nomeJogo": "Hades", "preco": 49.90, "status": "Pendente" }
-```
-
-### `GET /compras/{orderId}` — [Authorize]
-Consulta o status do pedido: `Pendente | Aprovado | Rejeitado`.
-
-### `GET /biblioteca/{usuarioId}` — [Authorize]
-Lista os jogos que o usuário possui.
-```json
-{ "usuarioId": "guid", "jogos": [ { "jogoId": "guid", "nomeJogo": "Hades", "preco": 49.90, "dataAdicao": "2026-06-30T10:00:00Z" } ] }
-```
-
-### `GET /health` — sem auth
-Liveness/readiness probe. **Response 200:** `{ "status": "Healthy" }`
-
----
-
-## Banco de Dados
-
-**catalog-db** (SQLite) — só as entidades transacionais; `Jogo` e `Desejo` (wishlist)
-foram migradas para o **DynamoDB** (tabelas `Jogos` e `Desejos`, ver
-`Infra/DataProvider/Dynamo`), não vivem mais aqui:
-
-```sql
-Bibliotecas(Id PK, UsuarioId UNIQUE, CriadaEm)
-ItensBiblioteca(Id PK, BibliotecaId FK, JogoId, DataAdicao, UNIQUE(BibliotecaId, JogoId))
-Pedidos(Id PK, UsuarioId, JogoId, Preco, Status INTEGER, CriadoEm)  -- Status: 0=Pendente,1=Aprovado,2=Rejeitado
-```
-
-Tabelas de infraestrutura do **Transactional Outbox** (MassTransit): `InboxState`,
-`OutboxMessage`, `OutboxState`. A migration é aplicada automaticamente no startup da API
-e do Worker (`Database.Migrate()`).
-
----
+Na subida a API cria as tabelas do DynamoDB se faltarem e semeia 3 jogos (Hades R$ 49,90,
+Hollow Knight R$ 29,90, Cyberpunk 2077 R$ 149,90 — este último é rejeitado no pagamento, por passar de R$ 100).
 
 ## Eventos
 
-### Consome
+| Evento | Papel | Fila | O que acontece |
+|---|---|---|---|
+| `UsuarioCriadoEvento` | consome (worker) | `catalog-usuario-criado` | cria a biblioteca vazia (ignora se já existe) |
+| `PagamentoProcessadoEvento` | consome (worker) | `catalog-pagamento-processado` | `Aprovado`: pedido aprovado + jogo na biblioteca; `Rejeitado`: pedido rejeitado (ignora pedido já finalizado) |
+| `PedidoRealizadoEvento` | publica (API) | — | consumido pelo payments |
 
-**`UsuarioCriadoEvento`** — publicado pelo UsersAPI · fila `catalog-usuario-criado`
-→ cria a `Biblioteca` vazia (idempotente por `UsuarioId`).
+Contratos: [`fcg-integration-events`](https://github.com/FIAP-POS-TECH-TEAM-10/fcg-integration-events).
 
-**`PagamentoProcessadoEvento`** — publicado pelo PaymentsAPI · fila `catalog-pagamento-processado`
-→ Aprovado: `Pedido=Aprovado` + `ItemBiblioteca`; Rejeitado: `Pedido=Rejeitado`.
+## Dados
 
-Ambos os endpoints usam **Inbox** (`UseEntityFrameworkOutbox`) para deduplicação transacional.
+- **DynamoDB**: tabelas `Jogos` e `Desejos` (fora do cluster; sobrevivem ao desligar). Local: `dynamodb-local` do compose.
+- **SQLite**: `Bibliotecas`, `ItensBiblioteca`, `Pedidos` (API e worker usam o mesmo arquivo).
+- **Redis**: cache das consultas de jogos; sem `ConnectionStrings__Redis` usa cache em memória.
 
-### Publica
+## Variáveis de ambiente
 
-**`PedidoRealizadoEvento`** — consumido pelo PaymentsAPI
-```csharp
-record PedidoRealizadoEvento(
-    Guid PedidoId, Guid UsuarioId, Guid JogoId, string NomeJogo,
-    decimal Preco, DateTime RealizadoEmUtc, Guid CorrelationId);
-```
-Publicado via **Bus Outbox**: o evento é gravado na mesma transação do `Pedido` e
-entregue ao broker em background (não se perde se o RabbitMQ estiver fora).
+| Variável | Obrigatória | O que é |
+|---|---|---|
+| `JWT__KEY` · `JWT__ISSUER` | sim (API) | validação do JWT (mesma chave do users) |
+| `ConnectionStrings__DefaultConnection` | não (`Data Source=fcgames.db`) | SQLite |
+| `ConnectionStrings__Redis` | não | ex.: `redis:6379` |
+| `DynamoDb__ServiceUrl` | não | URL do DynamoDB local; vazio = DynamoDB da AWS |
+| `DynamoDb__Region` | não | região do DynamoDB |
+| `Messaging__Provider` | não | `Sqs` = SQS/SNS (AWS); vazio + `RabbitMQ__Host` = RabbitMQ; nenhum = em memória |
+| `AWS__Region` | não | região do SQS/SNS |
+| `RabbitMQ__Host` · `RabbitMQ__Username` · `RabbitMQ__Password` | com RabbitMQ | broker local |
 
----
+Segredos não ficam no repositório: localmente vêm do `.env` do
+[`fcg-orchestration`](https://github.com/FIAP-POS-TECH-TEAM-10/fcg-orchestration); no EKS, do Secret `fcg-jwt`.
 
-## Variáveis de Ambiente
+## Rodar local
 
-| Variável | Descrição | Exemplo |
-|----------|-----------|---------|
-| `JWT__KEY` | Chave de assinatura JWT (mínimo 32 chars) | `<chave com 32+ caracteres>` |
-| `JWT__ISSUER` | Issuer validado no token | `AppFiapFcGames` |
-| `ConnectionStrings__DefaultConnection` | Connection string do banco | `Data Source=/data/catalog.db` |
-| `RabbitMQ__Host` | Host do RabbitMQ (usado se `Messaging__Provider` não for `Sqs`) | `rabbitmq` |
-| `RabbitMQ__Username` | Usuário RabbitMQ | defina no ambiente (sem padrão) |
-| `RabbitMQ__Password` | Senha RabbitMQ | defina no ambiente (sem padrão) |
-| `Messaging__Provider` | `Sqs` usa Amazon SQS/SNS (deploy AWS). Vazio + `RabbitMQ__Host` → RabbitMQ. Nenhum dos dois → in-memory | `Sqs` |
-| `AWS__Region` | Região usada pelo transporte SQS/SNS quando `Messaging__Provider=Sqs` | `sa-east-1` |
+Jeito recomendado: `docker compose up` no `fcg-orchestration`. Só este serviço (precisa de
+RabbitMQ e DynamoDB local, ou das variáveis acima):
 
-> **Segredos nunca devem estar no `appsettings.json` de produção.** Use env vars ou Kubernetes secrets.
-
-> **Rodando fora do docker-compose:** exporte `JWT__KEY`, `RABBITMQ__USERNAME` e `RABBITMQ__PASSWORD` (não há valores padrão no código nem nos `appsettings`; o compose do `fcg-orchestration` os injeta a partir do `.env`).
-
-> **Mensageria:** o transporte é escolhido em runtime (`AddMassTransitMessaging` na Api, mesmo padrão
-> inline no `Worker/Program.cs`) — os consumers e o código de aplicação não mudam entre RabbitMQ e SQS.
-> No ECS/AWS, o SDK usa a **Task Role** da task definition (`fcg-catalog-service-ecs-task-role`) pra
-> autenticar no SQS/SNS — nenhuma credencial no código ou em variável de ambiente.
-
----
-
-## Rodando Localmente
-
-### Pré-requisitos
-- .NET 10 SDK
-- RabbitMQ em `localhost:5672` (ou via Docker)
-- `NUGET_AUTH_TOKEN` com scope `read:packages` (restaura `FCGames.IntegrationEvents`)
-
-### 1. Configurar NUGET_AUTH_TOKEN
 ```bash
-export NUGET_AUTH_TOKEN=ghp_...        # PowerShell: $env:NUGET_AUTH_TOKEN="ghp_..."
+export NUGET_AUTH_TOKEN=$(gh auth token)   # pacote FCGames.IntegrationEvents (read:packages)
+dotnet run --project app/src/Fiap.FCGames.Catalogo.Api       # http://localhost:5002 (Swagger em Development)
+dotnet run --project app/src/Fiap.FCGames.Catalogo.Worker    # outro terminal
 ```
 
-### 2. Restaurar e rodar a API
-```bash
-cd app/src
-dotnet run --project Fiap.FCGames.Catalogo.Api
-# http://localhost:5002/swagger
-```
+Imagens: `docker build --secret id=GITHUB_TOKEN,env=NUGET_AUTH_TOKEN -t fcg-catalog-service .`
+(API) e `-f Dockerfile.worker` (worker).
 
-### 3. Rodar o Worker (terminal separado)
-```bash
-cd app/src
-dotnet run --project Fiap.FCGames.Catalogo.Worker
-```
+## Na AWS
 
-### RabbitMQ via Docker (rápido)
-```bash
-docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
-# Management UI: http://localhost:15672 (usuário e senha definidos em `RABBITMQ__USERNAME`/`RABBITMQ__PASSWORD`)
-```
+- Pod `catalog-api` no EKS `fcg-eks` (namespace `fcgames`) com 2 containers: `api` e `worker`
+  (mesmo SQLite em disco efêmero). ALB em `/jogos`, `/compras`, `/biblioteca`, `/desejos`.
+- Imagens no ECR `fcg-catalog-service` (`:<sha7>`/`:latest` e `:worker-<sha7>`/`:worker-latest`).
+- SQS/SNS e DynamoDB pela role `fcg-eks-catalog-api` (Pod Identity). Redis é um pod no cluster.
+- Manifests: `fcg-orchestration/k8s/eks`.
 
-> Para subir a stack completa (todos os serviços + RabbitMQ), use o repositório
-> [`fcg-orchestration`](../fcg-orchestration/) (`docker compose up -d --build`).
+## CI/CD
 
----
+`.github/workflows/ci-cd.yml`: PR → build, testes, imagens e Trivy. Merge na `main` → também push no
+ECR e rolling update do pod (API e worker juntos); com o cluster desligado o deploy é pulado e as
+imagens entram no próximo "Ligar". Ainda não há projeto de testes.
 
-## Estrutura de Pastas
-
-```
-fcg-catalog-service/
-├── nuget.config                          # feed GitHub Packages (FCGames.IntegrationEvents)
-├── Dockerfile / Dockerfile.worker        # imagens da API e do Worker
-├── app/src/
-│   ├── Fiap.FCGames.Catalogo.Api/
-│   │   ├── Controllers/                   # JogosController, ComprasController, BibliotecaController
-│   │   └── Program.cs
-│   ├── Fiap.FCGames.Catalogo.Worker/
-│   │   ├── Consumers/                     # UsuarioCriadoEventoConsumer, PagamentoProcessadoEventoConsumer
-│   │   └── Program.cs
-│   ├── Fiap.FCGames.Catalogo.Application/ # Commands (RealizarCompra, jogos) + Queries (CQRS/MediatR)
-│   ├── Fiap.FCGames.Catalogo.Domain/      # Jogo, Biblioteca, ItemBiblioteca, Pedido, StatusPedido
-│   ├── Fiap.FCGames.Catalogo.Infra/       # FcGamesContexto, repositories, Migrations
-│   └── Fiap.FCGames.Catalogo.CrossCutting/# Extensions (JWT, Swagger, Serilog, MassTransit)
-└── docs/
-```
-
----
-
-## Checklist de Entrega
-
-- [x] Domínio: `Jogo`, `Biblioteca`, `ItemBiblioteca`, `Pedido` + `StatusPedido`
-- [x] EF Core migrations (catalog-db)
-- [x] CRUD de jogos (`GET` público autenticado; `POST/PUT/DELETE` [Authorize Admin])
-- [x] `POST /compras` (202) + `GET /compras/{orderId}` + `GET /biblioteca/{usuarioId}`
-- [x] `GET /health`
-- [x] Consumer `UsuarioCriadoEvento` (cria biblioteca, idempotente)
-- [x] Consumer `PagamentoProcessadoEvento` (atualiza pedido + biblioteca)
-- [x] Publisher `PedidoRealizadoEvento`
-- [x] Transactional Outbox + Inbox (MassTransit) — entrega confiável
-- [x] Projeto Worker separado
-- [x] `nuget.config` (GitHub Packages)
-- [x] Dockerfile multi-stage (API + Worker)
-- [ ] Manifests Kubernetes (`/k8s/`)
-
-## Pipeline (CI/CD)
-
-`.github/workflows/ci-cd.yml` (GitHub Actions):
-
-| Gatilho | Jobs |
-|---|---|
-| Pull request → `main` | Build & testes → imagens Docker (API + worker) + **Trivy** (CRITICAL/HIGH, só reporta) |
-| Push na `main` / botão "Run workflow" na `main` | o mesmo + **push no ECR** (`:<sha7>`, `:latest`, `:worker-<sha7>`, `:worker-latest`) + **deploy no EKS** |
-
-- **Deploy:** `kubectl set image deploy/catalog-api api=<ECR>:<sha7> worker=<ECR>:worker-<sha7>` + `kubectl rollout status` — API e worker ficam no mesmo pod (SQLite compartilhado); rolling update sem downtime.
-- **Cluster desligado** (o `fcg-eks` só fica ligado nas sessões): o deploy é pulado com aviso e o run fica verde; as imagens `:latest`/`:worker-latest` entram no próximo `./scripts/eks-up.sh`.
-- **Trivy:** tabela no resumo do run e alertas na aba **Security → Code scanning** (categorias `trivy-api` e `trivy-worker`).
-- **Testes:** `dotnet test` roda quando existir um projeto `*Tests.csproj`; hoje o pipeline emite um aviso (pendência).
-- **Autenticação:** OIDC com a role `GitHubActions-ECS-Deploy-Role` (sem chave AWS no GitHub). Secret necessário: `PAT_PACKAGES` (`read:packages`).
+Para Kind/Docker Desktop local, ver [`k8s/README.md`](k8s/README.md).
