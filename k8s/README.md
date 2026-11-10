@@ -3,6 +3,14 @@
 Manifests só para cluster local (API e worker em deployments separados, volume compartilhado).
 Na AWS o deploy usa `fcg-orchestration/k8s/eks` (API e worker no mesmo pod).
 
+0. Gere as imagens com as tags que os deployments esperam (no Kind, carregue no cluster):
+
+```bash
+docker build --secret id=GITHUB_TOKEN,env=NUGET_AUTH_TOKEN -t fcg-catalog-api:latest .
+docker build --secret id=GITHUB_TOKEN,env=NUGET_AUTH_TOKEN -t fcg-catalog-worker:latest -f Dockerfile.worker .
+kind load docker-image fcg-catalog-api:latest fcg-catalog-worker:latest    # só no Kind
+```
+
 1. Crie o Secret real (o `secret.yaml` daqui é só modelo; as chaves AWS `local` são as fictícias
    que o DynamoDB local aceita):
 
