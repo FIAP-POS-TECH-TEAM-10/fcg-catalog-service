@@ -1,3 +1,4 @@
+using Fiap.FCGames.Catalogo.Application.Services;
 using Fiap.FCGames.Catalogo.Domain.Exception;
 using Fiap.FCGames.Catalogo.Infra.DataProvider.Interface;
 using MediatR;
@@ -9,11 +10,13 @@ public class RemoverJogoCommandHandler : IRequestHandler<RemoverJogoCommand, Uni
 {
     private readonly IUnitOfWork _uow;
     private readonly IDistributedCache _cache;
+    private readonly ElasticsearchService _elasticsearchService;
 
-    public RemoverJogoCommandHandler(IUnitOfWork uow, IDistributedCache cache)
+    public RemoverJogoCommandHandler(IUnitOfWork uow, IDistributedCache cache, ElasticsearchService elasticsearchService)
     {
         _uow = uow;
         _cache = cache;
+        _elasticsearchService = elasticsearchService;
     }
 
     public async Task<Unit> Handle(RemoverJogoCommand request, CancellationToken cancellationToken)
@@ -23,6 +26,9 @@ public class RemoverJogoCommandHandler : IRequestHandler<RemoverJogoCommand, Uni
 
         await _uow.JogoRepository.RemoverAsync(jogo);
         await _cache.RemoveAsync("catalogo:jogos", cancellationToken);
+        
+        // Desindexar do Elasticsearch de forma assíncrona (fire-and-forget)
+        _ = _elasticsearchService.RemoverJogoAsync(request.Id, cancellationToken);
 
         return Unit.Value;
     }
