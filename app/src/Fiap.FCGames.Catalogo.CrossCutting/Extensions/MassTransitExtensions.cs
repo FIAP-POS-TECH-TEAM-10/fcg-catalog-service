@@ -1,3 +1,4 @@
+using Fiap.FCGames.Catalogo.Infra.DataProvider.Contexto;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
