@@ -1,5 +1,6 @@
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DataModel;
+using Fiap.FCGames.Catalogo.Application.Services;
 using Fiap.FCGames.Catalogo.CrossCutting.Extensions;
 using Fiap.FCGames.Catalogo.CrossCutting.Middleware;
 using Fiap.FCGames.Catalogo.Infra.DataProvider.Contexto;
@@ -36,6 +37,12 @@ builder.Services.AddDynamoDb(builder.Configuration);
 
 builder.Services.AddRedisCache(builder.Configuration);
 
+// Registrar Elasticsearch
+builder.Services.AddElasticsearch(builder.Configuration);
+
+// Registrar ElasticsearchService como Singleton
+builder.Services.AddSingleton<ElasticsearchService>();
+
 builder.Services.AddMassTransitMessaging(builder.Configuration);
 
 builder.Services.AddHealthChecks()
@@ -65,6 +72,10 @@ if (!app.Environment.IsEnvironment("Testing"))
 
     var dynamoContext = scope.ServiceProvider.GetRequiredService<IDynamoDBContext>();
     await SeedData.SeedJogosAsync(dynamoContext);
+
+    // Garantir que o índice Elasticsearch existe no startup
+    var elasticsearchService = scope.ServiceProvider.GetRequiredService<ElasticsearchService>();
+    await elasticsearchService.EnsureIndexExistsAsync();
 }
 
 app.UseCorrelationId();
