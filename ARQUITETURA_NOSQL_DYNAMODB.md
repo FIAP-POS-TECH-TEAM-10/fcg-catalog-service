@@ -1,6 +1,5 @@
 # Arquitetura do Catálogo: antes e agora
 
-Apoio visual do [roteiro do vídeo](ROTEIRO_VIDEO_NOSQL_DYNAMODB.md). Abra a prévia Markdown do VS Code (Ctrl+Shift+V) para visualizar os fluxogramas Mermaid.
 
 ## Antes: persistência relacional
 
