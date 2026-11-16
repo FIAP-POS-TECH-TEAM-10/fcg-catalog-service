@@ -25,7 +25,7 @@ public class JogosController : ApiControllerBase<JogosController>
     }
 
     [HttpPost]
-    [Authorize(Policy = AuthConstants.AdminPolicy)]
+    [Authorize]
     public async Task<IActionResult> CriarAsync([FromBody] CriarJogoCommand command, CancellationToken cancellationToken)
     {
         var result = await _sender.Send(command, cancellationToken);
